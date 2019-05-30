@@ -2,14 +2,15 @@ from PIL import Image, ImageDraw
 from math import sqrt
 from random import randint
 from enum import Enum
+from sklearn.cluster import KMeans
+import numpy as np
 
 
 class TypePixelation(Enum):
     K_AVERAGE_RANDOM_POINT = 1
     K_AVERAGE_POPULAR_POINT = 2
     NEURAL_NETWORK = 3
-    CUSTOM_ALGORITHM = 4
-    NONE = 5
+    NONE = 4
 
 
 class Pixelation:
@@ -54,6 +55,9 @@ class Pixelation:
         return self._get_average_color(colors)
 
     def _set_color_block(self, x, y, color):
+        if not(type(color) is tuple):
+            color = int(np.int64(color[0][0])), int(np.int64(color[0][1])), int(np.int64(color[0][2]))
+
         for i in range(x, min(self.width, x + self.size_block)):
             for j in range(y, min(self.height, y + self.size_block)):
                 self.image_draw.point((i, j), color)
@@ -113,7 +117,7 @@ class Pixelation:
 
         return colors
 
-    def _solve_clustering(self):
+    def _solve_k_average(self):
         if self.type == TypePixelation.K_AVERAGE_POPULAR_POINT:
             center_points = self._get_k_most_popular_color(self._get_all_colors(), self.number_colors)
         else:
@@ -126,12 +130,8 @@ class Pixelation:
             for list_points in list_points_match_random_point:
                 list_points.clear()
 
-            for i_block in range(self.number_blocks_in_width):
-                for j_block in range(self.number_blocks_in_height):
-                    list_points_match_random_point[self._get_id_nearest_point(self.pixels[
-                        i_block * self.size_block,
-                        j_block * self.size_block
-                    ], center_points)].append(self.pixels[i_block * self.size_block, j_block * self.size_block])
+            for color in self._get_all_colors():
+                list_points_match_random_point[self._get_id_nearest_point(color, center_points)].append(color)
 
             for list_points_id in range(self.number_colors):
                 center_points[list_points_id] = self._get_average_color(list_points_match_random_point[list_points_id])
@@ -145,58 +145,39 @@ class Pixelation:
 
         for i_block in range(self.number_blocks_in_width):
             for j_block in range(self.number_blocks_in_height):
-                self._set_color_block(i_block * self.size_block, j_block * self.size_block, to_color[self.pixels[i_block * self.size_block, j_block * self.size_block]])
+                self._set_color_block(
+                    i_block * self.size_block,
+                    j_block * self.size_block,
+                    to_color[self.pixels[i_block * self.size_block, j_block * self.size_block]]
+                )
+
+    def _solve_neural_network(self):
+        data = np.array(self._get_all_colors())
+
+        kmeans = KMeans(n_clusters=self.number_colors, random_state=7882).fit(data)
+
+        centers = kmeans.cluster_centers_
+
+        for i_block in range(self.number_blocks_in_width):
+            for j_block in range(self.number_blocks_in_height):
+                self._set_color_block(
+                    i_block * self.size_block,
+                    j_block * self.size_block,
+                    centers[kmeans.predict([self.pixels[i_block * self.size_block, j_block * self.size_block]])]
+                )
 
     def process_image(self):
         self._break_into_blocks()
         if self.type == TypePixelation.K_AVERAGE_POPULAR_POINT or self.type == TypePixelation.K_AVERAGE_RANDOM_POINT:
-            self._solve_clustering()
+            self._solve_k_average()
+        if self.type == TypePixelation.NEURAL_NETWORK:
+            self._solve_neural_network()
+        print(len(set(self._get_all_colors())))
         self.image.show()
 
 
-pixelation = Pixelation('res/varya.jpg', 10, 30, TypePixelation.K_AVERAGE_POPULAR_POINT)
+pixelation = Pixelation('res/varya.jpg', 10, 30, TypePixelation.NEURAL_NETWORK)
 pixelation.process_image()
 
-# to_color = {}
-#
-# while len(number_color) > 0:
-#     max_number = 0
-#     for color, number in number_color.items():
-#         if number > max_number:
-#             max_number = number
-#             max_color = color
-#
-#     list_colors = []
-#
-#     for color, number in number_color.items():
-#         if get_dist_for_two_color(color, max_color) < 35:
-#             list_colors.append(color)
-#
-#     mid_color = get_mid_color(list_colors)
-#
-#     for color, number in number_color.items():
-#         if get_dist_for_two_color(color, max_color) < 35:
-#             to_color[color] = max_color
-#
-#     for color in list_colors:
-#         number_color.pop(color)
-#
-# number_color = {}
-#
-# for i_block in range(width // SIZE_BLOCK + (1 if width % SIZE_BLOCK == 0 else 0)):
-#     for j_block in range(height // SIZE_BLOCK + (1 if height % SIZE_BLOCK == 0 else 0)):
-#         color = get_color_block(i_block * SIZE_BLOCK, j_block * SIZE_BLOCK, pix, width, height)
-#
-#         if not to_color.get(color) is None:
-#             color = to_color.get(color)
-#
-#         if number_color.get(color) is None:
-#             number_color[color] = 1
-#         else:
-#             number_color[color] = number_color.get(color) + 1
-#
-#         set_color_block(i_block * SIZE_BLOCK, j_block * SIZE_BLOCK, color, draw, width, height)
-#
-# print(len(number_color), size)
-#
-# image.show()
+pixelation = Pixelation('res/varya.jpg', 10, 30, TypePixelation.K_AVERAGE_RANDOM_POINT)
+pixelation.process_image()
