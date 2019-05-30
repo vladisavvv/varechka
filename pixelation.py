@@ -15,7 +15,7 @@ class TypePixelation(Enum):
 
 class Pixelation:
     # static settings
-    NUMBER_ITERATION = 10
+    NUMBER_ITERATION = 5
 
     def __init__(self, path_to_read_file, size_block, number_colors, type_pixelation):
         self.size_block = size_block
@@ -153,9 +153,7 @@ class Pixelation:
 
     def _solve_neural_network(self):
         data = np.array(self._get_all_colors())
-
         kmeans = KMeans(n_clusters=self.number_colors, random_state=7882).fit(data)
-
         centers = kmeans.cluster_centers_
 
         for i_block in range(self.number_blocks_in_width):
@@ -175,9 +173,8 @@ class Pixelation:
         print(len(set(self._get_all_colors())))
         self.image.show()
 
+    def save_result(self, path_to_output_file):
+        self.image.save(path_to_output_file, "JPEG")
 
-pixelation = Pixelation('res/varya.jpg', 10, 30, TypePixelation.NEURAL_NETWORK)
-pixelation.process_image()
-
-pixelation = Pixelation('res/varya.jpg', 10, 30, TypePixelation.K_AVERAGE_RANDOM_POINT)
-pixelation.process_image()
+    def get_colors(self):
+        return self._get_all_colors()
